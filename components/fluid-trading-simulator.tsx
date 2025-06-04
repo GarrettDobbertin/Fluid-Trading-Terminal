@@ -14,6 +14,7 @@ export default function FluidTradingSimulator() {
   const [anchorPrice, setAnchorPrice] = useState(100)
   const [microTradeAmount, setMicroTradeAmount] = useState(1)
   const [tradeInterval, setTradeInterval] = useState(3)
+  const [growthRate] = useState(0.002) // 0.2% exponential growth per interval
 
   // Simulation state
   const [isRunning, setIsRunning] = useState(false)
@@ -36,10 +37,17 @@ export default function FluidTradingSimulator() {
     setIsRunning(true)
 
     timerRef.current = setInterval(() => {
-      // Generate random price movement
+      // Replace the existing price generation section with:
+      // Generate exponential growth with volatility
+      const growthRate = 0.002 // 0.2% growth per interval (exponential)
+      const timeElapsed = priceData.length
+      const exponentialBase = anchorPrice * Math.pow(1 + growthRate, timeElapsed)
+
+      // Add random volatility around the exponential trend
       const randomChange = (Math.random() - 0.5) * 2 // Random value between -1 and 1
-      const volatility = anchorPrice * 0.01 // 1% volatility
-      const newPrice = currentPrice + randomChange * volatility
+      const volatility = exponentialBase * 0.015 // 1.5% volatility relative to current trend price
+      const newPrice = exponentialBase + randomChange * volatility
+
       setCurrentPrice(newPrice)
 
       // Add new price point to chart data
@@ -175,6 +183,13 @@ export default function FluidTradingSimulator() {
                 onChange={(e) => setTradeInterval(Number(e.target.value))}
                 disabled={isRunning}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="growth-info">Growth Rate</Label>
+              <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
+                {(growthRate * 100).toFixed(1)}% per interval (exponential)
+              </div>
             </div>
 
             <div className="flex flex-col space-y-2">
