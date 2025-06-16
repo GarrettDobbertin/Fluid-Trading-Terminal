@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { ArrowUpCircle, ArrowDownCircle, Play, Pause, RefreshCw } from "lucide-react"
+import { ArrowUpCircle, ArrowDownCircle, Play, Pause, RefreshCw, Download } from "lucide-react"
 
 export default function FluidTradingSimulator() {
   // Simulation settings
@@ -23,6 +23,9 @@ export default function FluidTradingSimulator() {
   const [sharesHeld, setSharesHeld] = useState(0)
   const [tradeStatus, setTradeStatus] = useState("IDLE")
   const [priceData, setPriceData] = useState([{ time: 0, price: anchorPrice }])
+  const [cashBalanceHistory, setCashBalanceHistory] = useState([
+    { time: 0, balance: 1000, change: 0, action: "INITIAL" },
+  ])
 
   // Timer reference
   const timerRef = useRef(null)
@@ -88,6 +91,30 @@ export default function FluidTradingSimulator() {
       } else {
         setTradeStatus("IDLE")
       }
+
+      // After the existing trade execution logic, add:
+      // Track cash balance changes
+      setCashBalanceHistory((prevHistory) => {
+        const lastBalance = prevHistory[prevHistory.length - 1]?.balance || 1000
+        const currentBalance =
+          cashBalance +
+          (newPrice < anchorPrice && cashBalance >= microTradeAmount ? -microTradeAmount : 0) +
+          (newPrice > anchorPrice && sharesHeld > 0 ? Math.min(sharesHeld, microTradeAmount / newPrice) * newPrice : 0)
+
+        if (currentBalance !== lastBalance) {
+          return [
+            ...prevHistory,
+            {
+              time: prevHistory.length,
+              balance: currentBalance,
+              change: currentBalance - lastBalance,
+              action: tradeStatus,
+              price: newPrice,
+            },
+          ]
+        }
+        return prevHistory
+      })
     }, tradeInterval * 1000)
   }
 
@@ -109,6 +136,7 @@ export default function FluidTradingSimulator() {
     setSharesHeld(0)
     setTradeStatus("IDLE")
     setPriceData([{ time: 0, price: anchorPrice }])
+    setCashBalanceHistory([{ time: 0, balance: 1000, change: 0, action: "INITIAL" }])
   }
 
   // Clean up timer on unmount
@@ -127,6 +155,32 @@ export default function FluidTradingSimulator() {
       setPriceData([{ time: 0, price: anchorPrice }])
     }
   }, [anchorPrice, isRunning])
+
+  // Export cash balance data
+  const exportCashBalanceData = () => {
+    const csvContent = [
+      ["Time", "Cash Balance", "Change", "Action", "Asset Price"].join(","),
+      ...cashBalanceHistory.map((entry) =>
+        [
+          entry.time,
+          entry.balance.toFixed(2),
+          entry.change.toFixed(2),
+          entry.action,
+          entry.price?.toFixed(2) || "N/A",
+        ].join(","),
+      ),
+    ].join("\n")
+
+    const blob = new Blob([csvContent], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `cash-balance-history-${new Date().toISOString().split("T")[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -206,6 +260,12 @@ export default function FluidTradingSimulator() {
               <Button onClick={resetSimulation} variant="secondary" className="w-full">
                 <RefreshCw className="mr-2 h-4 w-4" /> Reset
               </Button>
+
+              {!isRunning && cashBalanceHistory.length > 1 && (
+                <Button onClick={exportCashBalanceData} variant="outline" className="w-full">
+                  <Download className="mr-2 h-4 w-4" /> Export Cash History
+                </Button>
+              )}
             </div>
           </div>
         </aside>
